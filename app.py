@@ -250,9 +250,6 @@ def run_real_openai_llm(prompt: str, model: str, temperature: float, api_key: st
 # Read logs once near the top so the sidebar and tabs share the same data.
 prompt_logs = get_all_prompt_logs()
 
-# API status. In Mock Mode, an API key is intentionally not required.
-openai_api_key = get_openai_api_key()
-
 
 # Sidebar: quick project status for portfolio viewers.
 with st.sidebar:
@@ -263,6 +260,12 @@ with st.sidebar:
         options=["Mock Mode", "Real API Mode"],
         index=0,
     )
+    # Only check secrets or environment variables when Real API Mode is chosen.
+    # This prevents Streamlit from showing a secrets warning in Mock Mode.
+    openai_api_key = None
+    if selected_mode == "Real API Mode":
+        openai_api_key = get_openai_api_key()
+
     st.divider()
     st.write(f"**Current mode:** {selected_mode}")
     if selected_mode == "Mock Mode":
@@ -505,40 +508,14 @@ with history_tab:
     st.header("Prompt History")
     st.caption("This table stores every mock prompt run saved in the local SQLite database.")
 
-    history_button_col1, history_button_col2 = st.columns(2)
-
-    with history_button_col1:
-        if st.button("Refresh History"):
-            st.rerun()
-
-    with history_button_col2:
-        confirm_clear_history = st.checkbox(
-            "I understand this will delete all saved prompt logs."
-        )
-        clear_history_clicked = st.button(
-            "Clear Prompt History",
-            disabled=not confirm_clear_history,
-        )
+    if st.button("Refresh History"):
+        st.rerun()
 
     if st.session_state.pop("prompt_history_cleared", False):
         st.success("Prompt history cleared.")
 
-    if clear_history_clicked:
-        if clear_prompt_logs():
-            st.session_state["prompt_history_cleared"] = True
-            st.rerun()
-        else:
-            st.error("Prompt history could not be cleared.")
-
     if not prompt_logs:
-        st.info("No prompt history yet. Run a prompt first to create records.")
-        st.download_button(
-            label="Download Filtered History as CSV",
-            data="",
-            file_name="llm_prompt_history.csv",
-            mime="text/csv",
-            disabled=True,
-        )
+        st.info("No prompt history yet. Run a prompt first.")
     else:
         history_columns = [
             "timestamp",
@@ -557,8 +534,28 @@ with history_tab:
             history_rows.append({column: log[column] for column in history_columns})
 
         if not history_rows:
-            st.info("No prompt history yet. Run a prompt first to create records.")
+            st.info("No prompt history yet. Run a prompt first.")
         else:
+            history_action_col1, history_action_col2 = st.columns(2)
+
+            with history_action_col1:
+                confirm_clear_history = st.checkbox(
+                    "I understand this will delete all saved prompt logs."
+                )
+
+            with history_action_col2:
+                clear_history_clicked = st.button(
+                    "Clear Prompt History",
+                    disabled=not confirm_clear_history,
+                )
+
+            if clear_history_clicked:
+                if clear_prompt_logs():
+                    st.session_state["prompt_history_cleared"] = True
+                    st.rerun()
+                else:
+                    st.error("Prompt history could not be cleared.")
+
             filter_col1, filter_col2 = st.columns(2)
 
             with filter_col1:
