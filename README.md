@@ -1,5 +1,9 @@
 # LLM Metrics Dashboard
 
+Live App: https://llm-metrics-dashboard-dvdr998.streamlit.app/
+
+GitHub Repository: https://github.com/dvdr998/llm-metrics-dashboard
+
 A Streamlit dashboard for running mock LLM prompts and tracking useful metrics such as latency, estimated token usage, estimated cost, prompt history, and model usage.
 
 This project currently runs in **Mock Mode**. It does **not** make real OpenAI API calls yet.
