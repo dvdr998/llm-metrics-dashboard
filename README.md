@@ -214,3 +214,10 @@ This project helped me practice:
 - Thinking through how LLM usage metrics can be tracked in both mock and optional real API workflows
 
 The project is intentionally kept honest and lightweight. It is not production-ready, but it demonstrates the foundation of an LLM metrics dashboard that can be extended later.
+
+## License and Usage
+
+Copyright (c) 2026 Vamshidhar Reddy Devulapally. All rights reserved.
+
+This project is shared publicly as a portfolio and learning project. You may view the code for review purposes, but you may not copy, modify, distribute, or reuse this project without written permission from the author.
+
