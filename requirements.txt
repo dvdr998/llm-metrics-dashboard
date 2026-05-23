@@ -3,3 +3,7 @@ python-dotenv==1.0.0
 openai
 tiktoken
 matplotlib
+torch
+transformers
+accelerate
+psutil
