@@ -8,12 +8,8 @@
 # Anthropic: https://www.anthropic.com/pricing
 # Format: {"model_name": {"input": price_per_1k_tokens, "output": price_per_1k_tokens}}
 MODEL_PRICING = {
-    "gpt-4-mini": {
-        "input": 0.0015,      # $0.0015 per 1K input tokens
-        "output": 0.002,      # $0.002 per 1K output tokens
-    },
-    "gpt-4.1-mini": {
-        "input": 0.0015,
+    "gpt-5.2": {
+        "input": 0.0015,      # Placeholder pricing for portfolio demo
         "output": 0.002,
     },
     "gpt-4o-mini": {
@@ -31,7 +27,7 @@ MODEL_PRICING = {
 }
 
 
-def estimate_tokens(text: str, model: str = "gpt-4-mini") -> int:
+def estimate_tokens(text: str, model: str = "gpt-5.2") -> int:
     """
     Estimate how many tokens are in a piece of text.
     
@@ -85,8 +81,8 @@ def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> dict:
     """
     # Get pricing for the model, or use default pricing if model not found
     if model not in MODEL_PRICING:
-        # Default to gpt-4-mini pricing if model is unknown
-        pricing = MODEL_PRICING.get("gpt-4-mini", {"input": 0.0015, "output": 0.002})
+        # Default to gpt-5.2 placeholder pricing if model is unknown
+        pricing = MODEL_PRICING.get("gpt-5.2", {"input": 0.0015, "output": 0.002})
     else:
         pricing = MODEL_PRICING[model]
     

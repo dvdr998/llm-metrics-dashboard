@@ -11,15 +11,15 @@ load_dotenv()
 # LLM Model Configuration
 # List of supported LLM models (will be expanded as we add more providers)
 SUPPORTED_MODELS = [
-    "gpt-3.5-turbo",      # OpenAI
-    "gpt-4",              # OpenAI
-    "claude-2",           # Anthropic (future)
-    "llama-2",            # Meta (future)
+    "gpt-5.2",            # OpenAI
+    "gpt-4o-mini",        # OpenAI
+    "mock-fast-model",    # Local mock model
+    "mock-quality-model", # Local mock model
 ]
 
 # Default model to use when no model is specified
-# This is loaded from the .env file, with a fallback to "gpt-4-mini"
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gpt-4-mini")
+# This is loaded from the .env file, with a fallback to a current OpenAI model
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gpt-5.2")
 
 # API Configuration
 # These store API keys loaded from environment variables
@@ -33,13 +33,13 @@ API_KEYS = {
 # Price per 1K tokens for different models (in USD)
 # Format: {"model_name": {"prompt": price_per_1k, "completion": price_per_1k}}
 MODEL_PRICING = {
-    "gpt-3.5-turbo": {
+    "gpt-5.2": {
         "prompt": 0.0015,        # $0.0015 per 1K prompt tokens
         "completion": 0.002,     # $0.002 per 1K completion tokens
     },
-    "gpt-4": {
-        "prompt": 0.03,          # $0.03 per 1K prompt tokens
-        "completion": 0.06,      # $0.06 per 1K completion tokens
+    "gpt-4o-mini": {
+        "prompt": 0.00015,
+        "completion": 0.0006,
     },
 }
 

@@ -4,20 +4,21 @@ Live App: https://llm-metrics-dashboard-dvdr998.streamlit.app/
 
 GitHub Repository: https://github.com/dvdr998/llm-metrics-dashboard
 
-A Streamlit dashboard for running mock LLM prompts and tracking useful metrics such as latency, estimated token usage, estimated cost, prompt history, and model usage.
+A Streamlit dashboard for running LLM prompts and tracking useful metrics such as latency, token usage, estimated cost, prompt history, and model usage.
 
-This project currently runs in **Mock Mode**. It does **not** make real OpenAI API calls yet.
+The app supports both **Mock Mode** and optional **Real API Mode**. Mock Mode is the default safe mode and does not make real OpenAI API calls.
 
 ## Why I Built This
 
 I built this project to practice the core pieces of an LLM observability workflow: running prompts, collecting metrics, saving logs, and visualizing usage over time.
 
-The goal was to create a realistic dashboard experience without requiring paid API usage during development. Mock Mode lets the app behave like an LLM metrics tool while keeping the project easy to run locally.
+The goal was to create a realistic dashboard experience without requiring paid API usage during development. Mock Mode lets the app behave like an LLM metrics tool while keeping the project easy to run locally, while Real API Mode can be enabled later for live OpenAI usage.
 
 ## Features
 
 - Prompt runner with model selection and temperature control
 - Mock LLM responses for local testing
+- Optional Real API Mode using the OpenAI Responses API
 - SQLite logging for every prompt run
 - Prompt history table with filters
 - Search prompt history by prompt text
@@ -36,6 +37,7 @@ The goal was to create a realistic dashboard experience without requiring paid A
 
 - Python
 - Streamlit
+- OpenAI Python SDK
 - SQLite
 - Matplotlib
 - python-dotenv
@@ -93,7 +95,7 @@ llm-metrics-dashboard/
 
 ## Mock Mode
 
-Mock Mode is the current operating mode for this project.
+Mock Mode is the default operating mode for this project.
 
 In Mock Mode:
 
@@ -103,6 +105,41 @@ In Mock Mode:
 - Token counts and costs are estimates, not real API billing data.
 
 This keeps the project simple to run and safe to test while the dashboard features are being developed.
+
+## Real API Mode
+
+Real API Mode is optional. When selected in the sidebar, the app uses the OpenAI Python SDK and the Responses API to send the prompt to OpenAI.
+
+The app looks for `OPENAI_API_KEY` in this order:
+
+1. Streamlit secrets
+2. Local environment variables
+
+If no API key is found, the app shows a warning and does not call the API.
+
+### Set `OPENAI_API_KEY` locally
+
+Create a local `.env` file:
+
+```bash
+OPENAI_API_KEY=your_api_key_here
+```
+
+The `.env` file is ignored by git and should never be committed.
+
+### Set `OPENAI_API_KEY` on Streamlit Cloud
+
+In Streamlit Cloud:
+
+1. Open the app settings.
+2. Go to **Secrets**.
+3. Add:
+
+   ```toml
+   OPENAI_API_KEY = "your_api_key_here"
+   ```
+
+API keys are never displayed in the app and should not be committed to GitHub.
 
 ## Database Logging
 
@@ -124,7 +161,7 @@ Each saved prompt run includes:
 
 - Timestamp
 - Prompt
-- Mock response
+- Mock or real response
 - Model
 - Temperature
 - Latency
@@ -158,7 +195,7 @@ Suggested screenshot files:
 
 ## Future Improvements
 
-- Real OpenAI API integration
+- More robust OpenAI model configuration
 - User authentication
 - Better token counting with tiktoken
 - More advanced analytics
@@ -174,6 +211,6 @@ This project helped me practice:
 - Structuring a Python project into reusable modules
 - Creating charts with Matplotlib
 - Exporting filtered data as CSV
-- Thinking through how LLM usage metrics can be tracked before adding real API calls
+- Thinking through how LLM usage metrics can be tracked in both mock and optional real API workflows
 
 The project is intentionally kept honest and lightweight. It is not production-ready, but it demonstrates the foundation of an LLM metrics dashboard that can be extended later.

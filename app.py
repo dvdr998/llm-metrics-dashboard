@@ -3,6 +3,7 @@
 
 import csv
 import os
+import time
 from io import StringIO
 
 import matplotlib.pyplot as plt
@@ -26,9 +27,20 @@ from src.database import (
 )
 from src.llm_client import run_mock_llm
 from src.metrics import estimate_cost
+from src.metrics import estimate_tokens
 
 
 APP_VERSION = "0.1.0"
+REAL_OPENAI_MODELS = [
+    "gpt-5.2",
+    "gpt-4o-mini",
+]
+MOCK_MODE_MODELS = [
+    "gpt-5.2",
+    "gpt-4o-mini",
+    "mock-fast-model",
+    "mock-quality-model",
+]
 
 
 # Configure the page before building the UI.
@@ -159,33 +171,123 @@ def show_mock_mode_notice():
     )
 
 
+def get_openai_api_key() -> str | None:
+    """
+    Read OPENAI_API_KEY from Streamlit secrets first, then environment variables.
+    
+    Streamlit Cloud stores secrets in st.secrets. Local development often uses
+    a .env file or shell environment variable.
+    """
+    try:
+        secret_key = st.secrets.get("OPENAI_API_KEY")
+        if secret_key:
+            return str(secret_key)
+    except Exception:
+        # st.secrets may not be configured in local development.
+        pass
+
+    return os.getenv("OPENAI_API_KEY")
+
+
+def get_usage_value(usage, field_name: str) -> int | None:
+    """
+    Safely read token usage from an OpenAI Responses API usage object.
+    """
+    if usage is None:
+        return None
+
+    if isinstance(usage, dict):
+        return usage.get(field_name)
+
+    return getattr(usage, field_name, None)
+
+
+def run_real_openai_llm(prompt: str, model: str, temperature: float, api_key: str) -> dict:
+    """
+    Send one prompt to OpenAI using the Responses API.
+    
+    This function is only called when the user explicitly selects Real API Mode
+    and a valid API key is available.
+    """
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key)
+    start_time = time.time()
+
+    response = client.responses.create(
+        model=model,
+        input=prompt,
+        temperature=temperature,
+        max_output_tokens=180,
+    )
+
+    latency_ms = (time.time() - start_time) * 1000
+    response_text = response.output_text
+
+    input_tokens = get_usage_value(response.usage, "input_tokens")
+    output_tokens = get_usage_value(response.usage, "output_tokens")
+    total_tokens = get_usage_value(response.usage, "total_tokens")
+
+    # If usage details are ever unavailable, fall back to local estimates so
+    # the dashboard and database still have usable values.
+    if input_tokens is None:
+        input_tokens = estimate_tokens(prompt, model)
+    if output_tokens is None:
+        output_tokens = estimate_tokens(response_text, model)
+    if total_tokens is None:
+        total_tokens = input_tokens + output_tokens
+
+    return {
+        "response": response_text,
+        "prompt_tokens": input_tokens,
+        "completion_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "latency_ms": latency_ms,
+        "model": model,
+    }
+
+
 # Read logs once near the top so the sidebar and tabs share the same data.
 prompt_logs = get_all_prompt_logs()
 
-# Environment/API status. In Mock Mode, an API key is intentionally not required.
-openai_api_key = os.getenv("OPENAI_API_KEY")
-api_key_is_valid = is_api_key_valid(openai_api_key) or USE_MOCK_LLM
+# API status. In Mock Mode, an API key is intentionally not required.
+openai_api_key = get_openai_api_key()
 
 
 # Sidebar: quick project status for portfolio viewers.
 with st.sidebar:
     st.title("LLM Metrics Dashboard")
     st.caption("Portfolio project status")
+    selected_mode = st.radio(
+        "Mode",
+        options=["Mock Mode", "Real API Mode"],
+        index=0,
+    )
     st.divider()
-    st.write("**Current mode:** Mock Mode")
-    st.write("**API status:** Not required in Mock Mode")
+    st.write(f"**Current mode:** {selected_mode}")
+    if selected_mode == "Mock Mode":
+        st.write("**API status:** Not required in Mock Mode")
+    elif is_api_key_valid(openai_api_key):
+        st.write("**API status:** Configured")
+    else:
+        st.write("**API status:** Missing")
     st.write(f"**Database status:** {'Connected' if database_connected else 'Not connected'}")
     st.write(f"**Total prompt runs:** {len(prompt_logs)}")
     st.write(f"**Version:** {APP_VERSION}")
 
 
 st.title("LLM Metrics Dashboard")
-st.caption("Cost, latency, token usage, and response tracking for mock LLM prompt runs.")
+st.caption("Cost, latency, token usage, and response tracking for LLM prompt runs.")
 
-if USE_MOCK_LLM:
+if selected_mode == "Mock Mode":
     show_mock_mode_notice()
-elif not api_key_is_valid:
-    st.warning("Real API mode is not enabled in this version. Turn Mock Mode back on to run prompts.")
+elif not is_api_key_valid(openai_api_key):
+    st.warning(
+        "Real API Mode is selected, but no valid OPENAI_API_KEY was found. "
+        "Add it to Streamlit secrets or your local environment before running real calls."
+    )
+else:
+    st.info("Real API Mode is selected. Prompt runs will call OpenAI and may incur API costs.")
 
 
 prompt_tab, dashboard_tab, history_tab, info_tab = st.tabs(
@@ -195,8 +297,13 @@ prompt_tab, dashboard_tab, history_tab, info_tab = st.tabs(
 
 with prompt_tab:
     st.header("Prompt Runner")
-    st.caption("Run a prompt against the local mock LLM and save the result to SQLite.")
-    show_mock_mode_notice()
+    st.caption("Run a prompt and save the result to SQLite.")
+    if selected_mode == "Mock Mode":
+        show_mock_mode_notice()
+        model_options = MOCK_MODE_MODELS
+    else:
+        st.info("Real API Mode uses the OpenAI Responses API and may incur API costs.")
+        model_options = REAL_OPENAI_MODELS
 
     with st.form(key="prompt_runner_form"):
         user_prompt = st.text_area(
@@ -210,13 +317,7 @@ with prompt_tab:
         with input_col1:
             selected_model = st.selectbox(
                 label="Select a model:",
-                options=[
-                    "gpt-4-mini",
-                    "gpt-4.1-mini",
-                    "gpt-4o-mini",
-                    "mock-fast-model",
-                    "mock-quality-model",
-                ],
+                options=model_options,
             )
 
         with input_col2:
@@ -233,10 +334,34 @@ with prompt_tab:
     if submit_button:
         if not user_prompt.strip():
             st.error("Please enter a prompt before running.")
-        elif USE_MOCK_LLM:
+        elif selected_mode == "Mock Mode":
             with st.spinner("Generating mock response..."):
                 result = run_mock_llm(user_prompt, selected_model)
+            run_mode = "mock"
+        else:
+            if not is_api_key_valid(openai_api_key):
+                st.warning(
+                    "Real API Mode is selected, but no valid OPENAI_API_KEY was found. "
+                    "Add it to Streamlit secrets or your local environment and try again."
+                )
+                result = None
+                run_mode = None
+            else:
+                try:
+                    with st.spinner("Calling OpenAI Responses API..."):
+                        result = run_real_openai_llm(
+                            prompt=user_prompt,
+                            model=selected_model,
+                            temperature=temperature,
+                            api_key=openai_api_key,
+                        )
+                    run_mode = "real"
+                except Exception as error:
+                    st.error(f"OpenAI API call failed: {error}")
+                    result = None
+                    run_mode = None
 
+        if result:
             latency_seconds = result["latency_ms"] / 1000
             input_tokens = result["prompt_tokens"]
             output_tokens = result["completion_tokens"]
@@ -285,7 +410,7 @@ with prompt_tab:
                 input_cost=cost_info["input_cost"],
                 output_cost=cost_info["output_cost"],
                 total_cost=cost_info["total_cost"],
-                mode="mock",
+                mode=run_mode,
             )
 
             if save_success:
@@ -297,15 +422,14 @@ with prompt_tab:
             else:
                 st.error("Prompt run could not be saved to database.")
 
-            show_mock_mode_notice()
-        else:
-            st.warning("Real OpenAI API calls are not enabled yet. Turn Mock Mode back on to run prompts.")
+            if selected_mode == "Mock Mode":
+                show_mock_mode_notice()
 
 
 with dashboard_tab:
     st.header("Dashboard")
     st.caption(
-        "This dashboard summarizes recent mock LLM prompt activity, including "
+        "This dashboard summarizes saved LLM prompt activity, including "
         "response latency, token estimates, and simulated cost trends."
     )
 
@@ -513,13 +637,13 @@ with info_tab:
     st.write(
         "LLM Metrics Dashboard is a portfolio-friendly Streamlit app for exploring "
         "how prompt runs can be tracked, logged, and summarized. It records mock "
-        "LLM responses, estimated token usage, simulated cost, and latency in a "
+        "or real LLM responses, token usage, estimated cost, and latency in a "
         "local SQLite database."
     )
     st.write(
-        "The app is currently running in Mock Mode, so it does not call the real "
-        "OpenAI API and does not require an API key. Real OpenAI API integration "
-        "can be enabled later when the project is ready for live usage data."
+        "Mock Mode is the default safe mode and does not require an API key. "
+        "Real API Mode is optional and only runs when selected and a valid "
+        "OPENAI_API_KEY is available."
     )
 
     st.subheader("Technologies")

@@ -151,7 +151,7 @@ def send_prompt_to_llm(prompt: str, model: str) -> dict:
     
     Args:
         prompt (str): The user's prompt/question
-        model (str): The LLM model to use (e.g., "gpt-3.5-turbo")
+        model (str): The LLM model to use (e.g., "gpt-5.2")
     
     Returns:
         dict: A dictionary containing:

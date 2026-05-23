@@ -89,7 +89,7 @@ def save_prompt_log(
     Args:
         prompt (str): The user's input prompt
         response (str): The model's response
-        model (str): The model name used (e.g., "gpt-4-mini")
+        model (str): The model name used (e.g., "gpt-5.2")
         temperature (float): Temperature setting used (0.0 - 1.0)
         latency_seconds (float): Response time in seconds
         input_tokens (int): Number of tokens in the prompt
