@@ -41,21 +41,25 @@ with st.sidebar:
 
 device_snapshot = get_device_snapshot()
 
-st.subheader("Current Device Snapshot")
+st.subheader("Current Runtime Environment Snapshot")
+st.info(
+    "These metrics describe the machine running this app. On localhost, this is your laptop. "
+    "On Streamlit Cloud, this is the cloud runtime/container, not the visitor's personal device."
+)
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("Device", device_snapshot.get("device", "unknown"))
+    st.metric("Runtime Device", device_snapshot.get("device", "unknown"))
 
 with col2:
-    st.metric("GPU", device_snapshot.get("gpu_name", "unknown"))
+    st.metric("Host GPU / Accelerator", device_snapshot.get("gpu_name", "unknown"))
 
 with col3:
-    st.metric("RAM Used GB", device_snapshot.get("ram_used_gb", "unknown"))
+    st.metric("Host RAM Used GB", device_snapshot.get("ram_used_gb", "unknown"))
 
 with col4:
-    st.metric("RAM Total GB", device_snapshot.get("ram_total_gb", "unknown"))
+    st.metric("Host RAM Total GB", device_snapshot.get("ram_total_gb", "unknown"))
 
 
 if "local_runner" not in st.session_state:
@@ -130,9 +134,11 @@ if run_button:
             st.json(load_info)
 
             st.subheader("Before Inference Snapshot")
+            st.caption("This is a host/runtime snapshot captured before local inference.")
             st.json(result["before_snapshot"])
 
             st.subheader("After Inference Snapshot")
+            st.caption("This is a host/runtime snapshot captured after local inference.")
             st.json(result["after_snapshot"])
 
         except Exception as error:
