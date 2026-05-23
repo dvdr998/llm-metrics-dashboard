@@ -407,7 +407,7 @@ with history_tab:
             st.error("Prompt history could not be cleared.")
 
     if not prompt_logs:
-        st.info("No prompt runs saved yet. Run a prompt first to populate the dashboard.")
+        st.info("No prompt history yet. Run a prompt first to create records.")
         st.download_button(
             label="Download Filtered History as CSV",
             data="",
@@ -432,74 +432,80 @@ with history_tab:
         for log in prompt_logs:
             history_rows.append({column: log[column] for column in history_columns})
 
-        filter_col1, filter_col2 = st.columns(2)
-
-        with filter_col1:
-            selected_history_model = st.selectbox(
-                "Filter by model",
-                options=["All"] + sorted({row["model"] for row in history_rows}),
-            )
-
-        with filter_col2:
-            selected_history_mode = st.selectbox(
-                "Filter by mode",
-                options=["All"] + sorted({row["mode"] for row in history_rows}),
-            )
-
-        search_col, recent_col = st.columns(2)
-
-        with search_col:
-            prompt_search_text = st.text_input(
-                "Search prompt text",
-                placeholder="Search saved prompts...",
-            )
-
-        with recent_col:
-            recent_record_limit = st.slider(
-                "Show recent N records",
-                min_value=1,
-                max_value=len(history_rows),
-                value=min(20, len(history_rows)),
-                step=1,
-            )
-
-        filtered_history_rows = history_rows
-
-        if selected_history_model != "All":
-            filtered_history_rows = [
-                row for row in filtered_history_rows
-                if row["model"] == selected_history_model
-            ]
-
-        if selected_history_mode != "All":
-            filtered_history_rows = [
-                row for row in filtered_history_rows
-                if row["mode"] == selected_history_mode
-            ]
-
-        if prompt_search_text.strip():
-            search_text = prompt_search_text.lower().strip()
-            filtered_history_rows = [
-                row for row in filtered_history_rows
-                if search_text in row["prompt"].lower()
-            ]
-
-        # The database query returns newest rows first, so slicing here keeps
-        # the most recent matching records.
-        filtered_history_rows = filtered_history_rows[:recent_record_limit]
-
-        st.download_button(
-            label="Download Filtered History as CSV",
-            data=convert_rows_to_csv(filtered_history_rows),
-            file_name="llm_prompt_history.csv",
-            mime="text/csv",
-            disabled=not filtered_history_rows,
-        )
-
-        if not filtered_history_rows:
-            st.info("No prompt history matches the selected filters.")
+        if not history_rows:
+            st.info("No prompt history yet. Run a prompt first to create records.")
         else:
-            st.dataframe(filtered_history_rows, use_container_width=True)
+            filter_col1, filter_col2 = st.columns(2)
+
+            with filter_col1:
+                selected_history_model = st.selectbox(
+                    "Filter by model",
+                    options=["All"] + sorted({row["model"] for row in history_rows}),
+                )
+
+            with filter_col2:
+                selected_history_mode = st.selectbox(
+                    "Filter by mode",
+                    options=["All"] + sorted({row["mode"] for row in history_rows}),
+                )
+
+            search_col, recent_col = st.columns(2)
+
+            with search_col:
+                prompt_search_text = st.text_input(
+                    "Search prompt text",
+                    placeholder="Search saved prompts...",
+                )
+
+            # Only render the slider when there is at least one history row.
+            # This prevents Streamlit Cloud from receiving invalid min/max
+            # values when a fresh database has no prompt records.
+            with recent_col:
+                recent_record_limit = st.slider(
+                    "Show recent N records",
+                    min_value=1,
+                    max_value=len(history_rows),
+                    value=min(10, len(history_rows)),
+                    step=1,
+                )
+
+            filtered_history_rows = history_rows
+
+            if selected_history_model != "All":
+                filtered_history_rows = [
+                    row for row in filtered_history_rows
+                    if row["model"] == selected_history_model
+                ]
+
+            if selected_history_mode != "All":
+                filtered_history_rows = [
+                    row for row in filtered_history_rows
+                    if row["mode"] == selected_history_mode
+                ]
+
+            if prompt_search_text.strip():
+                search_text = prompt_search_text.lower().strip()
+                filtered_history_rows = [
+                    row for row in filtered_history_rows
+                    if search_text in row["prompt"].lower()
+                ]
+
+            # The database query returns newest rows first, so slicing here
+            # keeps the most recent matching records.
+            filtered_history_rows = filtered_history_rows[:recent_record_limit]
+
+            st.download_button(
+                label="Download Filtered History as CSV",
+                data=convert_rows_to_csv(filtered_history_rows),
+                file_name="llm_prompt_history.csv",
+                mime="text/csv",
+                disabled=not filtered_history_rows,
+            )
+
+            if not filtered_history_rows:
+                st.info("No prompt history matches the selected filters.")
+            else:
+                st.dataframe(filtered_history_rows, use_container_width=True)
 
 
 with info_tab:
