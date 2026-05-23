@@ -128,7 +128,7 @@ def create_token_usage_figure(rows: list):
     input_tokens = [row["input_tokens"] for row in rows]
     output_tokens = [row["output_tokens"] for row in rows]
 
-    ax.plot(run_numbers, input_tokens, marker="o", linewidth=2, label="Input tokens")
+    ax.plot(run_numbers, input_tokens, marker="o", linewidth=2, label="Billed input tokens")
     ax.plot(run_numbers, output_tokens, marker="o", linewidth=2, label="Output tokens")
     ax.set_title("Estimated Token Usage (Recent Prompt Runs)", fontsize=14, fontweight="bold")
     ax.set_xlabel("Recent prompt run")
@@ -214,6 +214,21 @@ def run_real_openai_llm(prompt: str, model: str, temperature: float, api_key: st
     client = OpenAI(api_key=api_key)
     start_time = time.time()
 
+    try:
+        prompt_token_count = client.responses.input_tokens.count(
+            model=model,
+            input=prompt,
+        )
+        prompt_tokens = get_usage_value(prompt_token_count, "input_tokens")
+        if prompt_tokens is None:
+            prompt_tokens = get_usage_value(prompt_token_count, "total_tokens")
+        if prompt_tokens is None:
+            prompt_tokens = estimate_tokens(prompt, model)
+    except Exception:
+        # Keep Real API Mode usable if token counting is unavailable in the
+        # installed SDK version.
+        prompt_tokens = estimate_tokens(prompt, model)
+
     response = client.responses.create(
         model=model,
         input=prompt,
@@ -224,22 +239,23 @@ def run_real_openai_llm(prompt: str, model: str, temperature: float, api_key: st
     latency_ms = (time.time() - start_time) * 1000
     response_text = response.output_text
 
-    input_tokens = get_usage_value(response.usage, "input_tokens")
+    billed_input_tokens = get_usage_value(response.usage, "input_tokens")
     output_tokens = get_usage_value(response.usage, "output_tokens")
     total_tokens = get_usage_value(response.usage, "total_tokens")
 
     # If usage details are ever unavailable, fall back to local estimates so
     # the dashboard and database still have usable values.
-    if input_tokens is None:
-        input_tokens = estimate_tokens(prompt, model)
+    if billed_input_tokens is None:
+        billed_input_tokens = estimate_tokens(prompt, model)
     if output_tokens is None:
         output_tokens = estimate_tokens(response_text, model)
     if total_tokens is None:
-        total_tokens = input_tokens + output_tokens
+        total_tokens = billed_input_tokens + output_tokens
 
     return {
         "response": response_text,
-        "prompt_tokens": input_tokens,
+        "prompt_tokens": prompt_tokens,
+        "billed_input_tokens": billed_input_tokens,
         "completion_tokens": output_tokens,
         "total_tokens": total_tokens,
         "latency_ms": latency_ms,
@@ -366,10 +382,11 @@ with prompt_tab:
 
         if result:
             latency_seconds = result["latency_ms"] / 1000
-            input_tokens = result["prompt_tokens"]
+            prompt_tokens = result["prompt_tokens"]
+            billed_input_tokens = result.get("billed_input_tokens", result["prompt_tokens"])
             output_tokens = result["completion_tokens"]
             total_tokens = result["total_tokens"]
-            cost_info = estimate_cost(selected_model, input_tokens, output_tokens)
+            cost_info = estimate_cost(selected_model, billed_input_tokens, output_tokens)
 
             st.divider()
             st.subheader("Response")
@@ -379,18 +396,33 @@ with prompt_tab:
             metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
 
             with metric_col1:
-                st.metric(label="Latency", value=f"{latency_seconds:.2f}s")
+                st.metric(label="Prompt Tokens", value=prompt_tokens)
             with metric_col2:
-                st.metric(label="Input Tokens", value=input_tokens)
+                input_token_label = (
+                    "Billed Input Tokens"
+                    if selected_mode == "Real API Mode"
+                    else "Estimated Input Tokens"
+                )
+                st.metric(label=input_token_label, value=billed_input_tokens)
             with metric_col3:
                 st.metric(label="Output Tokens", value=output_tokens)
             with metric_col4:
                 st.metric(label="Total Tokens", value=total_tokens)
 
-            st.caption(
-                "Token counts are estimated in Mock Mode. "
-                "Real API mode will use actual usage data from the API."
-            )
+            latency_col, note_col = st.columns([1, 3])
+            with latency_col:
+                st.metric(label="Latency", value=f"{latency_seconds:.2f}s")
+            with note_col:
+                if selected_mode == "Real API Mode":
+                    st.caption(
+                        "Prompt Tokens counts only the text you typed. "
+                        "Billed Input Tokens comes from OpenAI usage data and is used for cost calculation."
+                    )
+                else:
+                    st.caption(
+                        "Token counts are estimated in Mock Mode. "
+                        "Prompt Tokens and Estimated Input Tokens use the same local estimate."
+                    )
 
             cost_col1, cost_col2, cost_col3 = st.columns(3)
 
@@ -407,7 +439,7 @@ with prompt_tab:
                 model=selected_model,
                 temperature=temperature,
                 latency_seconds=latency_seconds,
-                input_tokens=input_tokens,
+                input_tokens=billed_input_tokens,
                 output_tokens=output_tokens,
                 total_tokens=total_tokens,
                 input_cost=cost_info["input_cost"],
