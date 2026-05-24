@@ -1,145 +1,267 @@
-# LLM Metrics Dashboard
+# LLM Metrics Dashboard with GPU-Aware Local LLM Inference Profiler
 
 Live App: https://llm-metrics-dashboard-dvdr998.streamlit.app/
 
 GitHub Repository: https://github.com/dvdr998/llm-metrics-dashboard
 
-A Streamlit dashboard for running LLM prompts and tracking useful metrics such as latency, token usage, estimated cost, prompt history, and model usage.
+## Overview
 
-The app supports both **Mock Mode** and optional **Real API Mode**. Mock Mode is the default safe mode and does not make real OpenAI API calls.
+LLM Metrics Dashboard is a Streamlit-based AI observability project for tracking how LLM prompts behave across API-based inference and local model inference.
+
+The project started as a simple dashboard to log prompts, latency, token usage, estimated cost, model usage, and prompt history. I later expanded it into a more transparent LLM profiling tool by adding optional OpenAI API support, accurate token estimation with `tiktoken`, SQLite logging, visual analytics, and a GPU-aware local LLM inference profiler using Hugging Face Transformers and PyTorch.
+
+The main goal of this project is not just to generate text. The goal is to make LLM behavior easier to understand by showing useful metrics such as:
+
+- Latency
+- Input tokens
+- Output tokens
+- Total tokens
+- Estimated cost
+- Tokens per second
+- Prompt history
+- Model usage
+- Local RAM usage
+- Local GPU or backend information
+- Device-level inference behavior
+
+This project is built as a practical portfolio project for learning LLM observability, prompt tracking, local inference profiling, and AI dashboard development.
+
+---
 
 ## Why I Built This
 
-I built this project to practice the core pieces of an LLM observability workflow: running prompts, collecting metrics, saving logs, and visualizing usage over time.
+When developers experiment with LLM prompts, it is easy to lose track of important details such as:
 
-The goal was to create a realistic dashboard experience without requiring paid API usage during development. Mock Mode lets the app behave like an LLM metrics tool while keeping the project easy to run locally, while Real API Mode can be enabled later for live OpenAI usage.
+- Which prompts were tested
+- Which model was used
+- How long the response took
+- How many tokens were used
+- How much the run may cost
+- How responses changed over time
+- Whether the prompt was tested in mock mode or real API mode
+- How local inference affects system memory and hardware resources
 
-## Features
+This dashboard solves that by giving a simple interface to run prompts, store results, and visualize the behavior of LLM requests over time.
 
-- Prompt runner with model selection and temperature control
-- Mock LLM responses for local testing
-- Optional Real API Mode using the OpenAI Responses API
-- SQLite logging for every prompt run
-- Prompt history table with filters
-- Search prompt history by prompt text
-- CSV export for filtered prompt history
-- Clear prompt history option
-- Summary metric cards for total runs, average latency, tokens, and cost
-- Matplotlib dashboard charts for:
-  - Latency trends
-  - Estimated cost trends
-  - Estimated token usage
-  - Prompt runs by model
-- Sidebar with app status, mode, database status, and run count
-- Tabbed UI for cleaner navigation
+I also wanted to understand the difference between cloud API inference and local LLM inference:
 
-## Tech Stack
+- API-based inference is usually higher quality and easier to use, but it has usage cost and depends on cloud services.
+- Local inference avoids API cost and can run on personal hardware, but performance depends heavily on the device, memory, backend, and model size.
 
-- Python
-- Streamlit
-- OpenAI Python SDK
-- SQLite
-- Matplotlib
-- python-dotenv
-- Environment variables
-- Modular project structure
+This project helped me explore both sides in one dashboard.
 
-## Project Structure
+---
 
-```text
-llm-metrics-dashboard/
-├── app.py              # Main Streamlit application
-├── requirements.txt    # Python dependencies
-├── README.md           # Project documentation
-├── llm_metrics.db      # Local SQLite database, created when the app runs
-└── src/
-    ├── __init__.py
-    ├── config.py       # App configuration and environment settings
-    ├── llm_client.py   # Mock LLM response logic
-    ├── metrics.py      # Token and cost estimation helpers
-    ├── database.py     # SQLite database helpers
-    └── charts.py       # Dashboard data preparation helpers
-```
+## Main Features
 
-## How To Run Locally
+### 1. Prompt Runner
 
-1. Create a virtual environment:
+The Prompt Runner allows users to enter a prompt and run it through the dashboard.
 
-   ```bash
-   python3 -m venv venv
-   ```
+It supports:
 
-2. Activate the virtual environment:
+- Model selection
+- Temperature control
+- Mock Mode
+- Optional Real API Mode
+- Response display
+- Latency tracking
+- Token estimation
+- Estimated cost calculation
+- Tokens per second calculation
+- Prompt logging into SQLite
 
-   ```bash
-   source venv/bin/activate
-   ```
+---
 
-3. Install dependencies:
+## Operating Modes
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Mock Mode
 
-4. Run the Streamlit app:
-
-   ```bash
-   streamlit run app.py
-   ```
-
-5. Open the local URL shown in your terminal, usually:
-
-   ```text
-   http://localhost:8501
-   ```
-
-## Mock Mode
-
-Mock Mode is the default operating mode for this project.
+Mock Mode is the default safe mode.
 
 In Mock Mode:
 
-- No real OpenAI API calls are made.
-- No API key is required to test the app.
-- Responses are generated locally from mock response templates.
-- Token counts and costs are estimates, not real API billing data.
+- No real OpenAI API call is made
+- No API key is required
+- The app generates a mock response locally
+- Token usage is estimated
+- Cost is estimated
+- The dashboard can be tested safely without spending API credits
 
-This keeps the project simple to run and safe to test while the dashboard features are being developed.
+Mock Mode is useful for testing the dashboard, UI, database logging, and analytics workflow without depending on paid API usage.
 
-## Real API Mode
+---
 
-Real API Mode is optional. When selected in the sidebar, the app uses the OpenAI Python SDK and the Responses API to send the prompt to OpenAI.
+### Real API Mode
 
-The app looks for `OPENAI_API_KEY` in this order:
+Real API Mode is optional.
+
+When enabled, the app uses the OpenAI Python SDK and the OpenAI Responses API to send the prompt to a selected OpenAI model.
+
+In Real API Mode, the app tracks:
+
+- Real response latency
+- Estimated input tokens
+- Estimated output tokens
+- Total tokens
+- Estimated cost
+- Tokens per second
+- Model used
+- Prompt and response history
+
+The app looks for the OpenAI API key from:
 
 1. Streamlit secrets
 2. Local environment variables
 
-If no API key is found, the app shows a warning and does not call the API.
+The API key is never committed to GitHub.
 
-### Set `OPENAI_API_KEY` locally
+---
 
-Create a local `.env` file:
+## Token Counting Improvements
 
-```bash
-OPENAI_API_KEY=your_api_key_here
-```
+I added `tiktoken` to improve token counting accuracy.
 
-The `.env` file is ignored by git and should never be committed.
+The dashboard separates:
 
-### Set `OPENAI_API_KEY` on Streamlit Cloud
+- Plain prompt token estimates
+- API-style billed token estimates
 
-In Streamlit Cloud:
+This is important because OpenAI chat-style or response-style APIs may include formatting overhead, system/message structure, or additional metadata. That means a simple prompt like `hi` can show more billed tokens than just the visible text.
 
-1. Open the app settings.
-2. Go to **Secrets**.
-3. Add:
+To avoid confusion, I added helper notes in the UI so users understand why short prompts can still produce higher billed token counts.
 
-   ```toml
-   OPENAI_API_KEY = "your_api_key_here"
-   ```
+---
 
-API keys are never displayed in the app and should not be committed to GitHub.
+## Metrics Tracked
+
+Each prompt run can track and store:
+
+- Timestamp
+- Prompt text
+- Response text
+- Model name
+- Temperature
+- Mode used
+- Latency
+- Input tokens
+- Output tokens
+- Total tokens
+- Tokens per second
+- Estimated input cost
+- Estimated output cost
+- Estimated total cost
+
+These metrics are saved into a local SQLite database and later used for dashboards, charts, filtering, and history review.
+
+---
+
+## Dashboard Metrics
+
+The dashboard includes summary cards for:
+
+- Total prompt runs
+- Average latency
+- Total tokens used
+- Total estimated cost
+
+It also includes charts for:
+
+- Latency trends
+- Estimated cost trends
+- Token usage trends
+- Prompt runs by model
+
+These charts help visualize how prompts behave over time.
+
+---
+
+## Prompt History
+
+The Prompt History page allows users to review previous prompt runs.
+
+It includes:
+
+- Stored prompt logs
+- Prompt text
+- Model used
+- Response
+- Latency
+- Token usage
+- Estimated cost
+- Timestamp
+- Search and filtering
+- CSV export
+- Clear history option
+
+This makes the dashboard useful as a lightweight LLM experiment tracker.
+
+---
+
+## GPU-Aware Local LLM Inference Profiler
+
+I added a second major feature: a GPU-aware local LLM inference profiler.
+
+This page allows users to run a small local LLM using:
+
+- Hugging Face Transformers
+- PyTorch
+- Local machine resources
+
+The profiler automatically detects the best available backend:
+
+- CUDA, if available
+- Apple Silicon MPS, if available
+- CPU, if no GPU backend is available
+
+During local inference, the app shows:
+
+- Device type
+- GPU or backend name
+- RAM used
+- Total RAM
+- MPS memory usage, when available
+- Before-inference memory snapshot
+- After-inference memory snapshot
+- Input tokens
+- Output tokens
+- Total tokens
+- Latency
+- Tokens per second
+
+This helps users understand how local LLM inference affects their machine.
+
+For example, on an Apple Silicon Mac, the profiler can detect MPS and show memory usage during inference. On Streamlit Cloud, the app may show CPU because hosted cloud environments usually do not expose Apple MPS or a local GPU.
+
+---
+
+## OpenAI API vs Local LLM Comparison
+
+This project is also moving toward comparing OpenAI API inference and local LLM inference more transparently.
+
+The comparison idea is:
+
+### API-Based Inference
+
+- Usually better response quality
+- Cloud-dependent
+- Requires API key
+- Has usage cost
+- Easier to run large models
+- Less hardware burden on the user device
+
+### Local LLM Inference
+
+- No API cost
+- Can run locally
+- Hardware-dependent
+- Smaller models may produce lower-quality responses
+- Performance depends on RAM, GPU, backend, and model size
+- Useful for learning local AI deployment and profiling
+
+The purpose is to help users understand not only the output of an LLM, but also the cost, speed, hardware impact, and deployment tradeoffs behind it.
+
+---
 
 ## Database Logging
 
@@ -149,75 +271,3 @@ Database file:
 
 ```text
 llm_metrics.db
-```
-
-Main table:
-
-```text
-prompt_logs
-```
-
-Each saved prompt run includes:
-
-- Timestamp
-- Prompt
-- Mock or real response
-- Model
-- Temperature
-- Latency
-- Input tokens
-- Output tokens
-- Total tokens
-- Estimated input cost
-- Estimated output cost
-- Estimated total cost
-- Mode
-
-The dashboard uses this saved history to track latency, tokens, estimated cost, and model usage over time.
-
-## Screenshots
-
-Screenshots should be added after running the app locally with:
-
-```bash
-streamlit run app.py
-```
-
-Suggested screenshot files:
-
-![Dashboard overview](screenshots/dashboard-overview.png)
-
-![Prompt runner](screenshots/prompt-runner.png)
-
-![Prompt history](screenshots/prompt-history.png)
-
-![Metrics charts](screenshots/metrics-charts.png)
-
-## Future Improvements
-
-- More robust OpenAI model configuration
-- User authentication
-- Better token counting with tiktoken
-- More advanced analytics
-- Deployment on Streamlit Cloud
-
-## What I Learned
-
-This project helped me practice:
-
-- Building a multi-tab Streamlit app
-- Designing a cleaner dashboard-style UI
-- Saving and reading data with SQLite
-- Structuring a Python project into reusable modules
-- Creating charts with Matplotlib
-- Exporting filtered data as CSV
-- Thinking through how LLM usage metrics can be tracked in both mock and optional real API workflows
-
-The project is intentionally kept honest and lightweight. It is not production-ready, but it demonstrates the foundation of an LLM metrics dashboard that can be extended later.
-
-## License and Usage
-
-Copyright (c) 2026 Vamshidhar Reddy Devulapally. All rights reserved.
-
-This project is shared publicly as a portfolio and learning project. You may view the code for review purposes, but you may not copy, modify, distribute, or reuse this project without written permission from the author.
-
